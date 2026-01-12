@@ -29,9 +29,9 @@ jobs:
         run: flet --version
         
       - name: Build Web App
-        # We went back to 'flet', added 'main.py' explicitly, and added '--verbose' for debugging
+        # Added '--yes' to auto-accept prompts
         run: |
-          flet build web main.py --base-url "/${{ github.event.repository.name }}/" --verbose
+          flet build web main.py --base-url "/${{ github.event.repository.name }}/" --yes --verbose
           
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
