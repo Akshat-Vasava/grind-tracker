@@ -1,49 +1,21 @@
-import threading
-import time
 import flet as ft
-from datetime import datetime
+import time
+import threading
 
 def main(page: ft.Page):
     page.title = "Grind Tracker"
     page.theme_mode = ft.ThemeMode.DARK
+    page.scroll = ft.ScrollMode.ADAPTIVE
     page.window_width = 400
     page.window_height = 700
-    # A dictionary to store the state of every task
-    task_states = {}
 
-    # Mobile-friendly timer
-    def run_timer(seconds, message):
-        # Update text
-        status_text.value = f"⏳ Timer started: {int(seconds/60)} mins"
-        page.update()
-        
-        # Wait
-        time.sleep(seconds)
-        
-        # 1. Play a sound (Optional - adds a nice "Ding")
-        # We add an invisible audio player to the page
-        audio1 = ft.Audio(src="https://luna-1.divorce-online.co.uk/audio/alert.mp3", autoplay=True)
-        page.overlay.append(audio1)
-        
-        # 2. Show a SnackBar (Mobile friendly notification)
-        page.snack_bar = ft.SnackBar(
-            content=ft.Text(f"⏰ {message}", size=20),
-            bgcolor=ft.Colors.RED_700,
-            open=True  # This forces it to pop up
-        )
-        
-        # Reset text
-        status_text.value = "✅ Timer Finished!"
-        page.update()
+    # --- DATA & STATE MANAGEMENT ---
+    # 1. Try to load saved data from the phone's memory
+    saved_tasks = page.client_storage.get("task_states")
+    if saved_tasks is None:
+        saved_tasks = {} # If no data, start fresh
 
-    # Button click handler
-    def start_coding_timer(e):
-        # 25 minutes = 1500 seconds (Pomodoro style)
-        # We run this in a thread so the app doesn't freeze
-        t = threading.Thread(target=run_timer, args=(1500, "Coding Session Done! Take a break."))
-        t.start()
-
-    # Tasks for each mode
+    # 2. Lists of tasks
     tasks_short_day = [
         "Power Workout (3:30 PM)",
         "Deep Coding Session (4:30 PM)",
@@ -67,75 +39,128 @@ def main(page: ft.Page):
         "Esports Scrims (8:30 PM)"
     ]
 
-    # Function to change the list based on button click
-    def set_mode(e, mode):
-        # SAVE STATE: Before clearing, save current checkboxes to the dictionary
+    # --- UI ELEMENTS ---
+    status_text = ft.Text(value="Select your day type:", size=20, weight="bold")
+    task_list = ft.Column()
+    progress_bar = ft.ProgressBar(width=400, color="amber", bgcolor="#222222", value=0)
+    
+    # --- LOGIC FUNCTIONS ---
+    
+    def save_data():
+        """Saves current checkboxes to phone memory"""
+        page.client_storage.set("task_states", saved_tasks)
+        update_progress()
+
+    def update_progress():
+        """Calculates % completion"""
+        if not task_list.controls:
+            progress_bar.value = 0
+            return
+            
+        total = len(task_list.controls)
+        checked = 0
         for control in task_list.controls:
-            if isinstance(control, ft.Checkbox):
-                task_states[control.label] = control.value
-
-        # Clear the old list
-        task_list.controls.clear()
+            if isinstance(control, ft.Checkbox) and control.value:
+                checked += 1
         
-        # Select the new list of tasks
-        if mode == "Short":
-            current_tasks = tasks_short_day
-        elif mode == "Long":
-            current_tasks = tasks_long_day
-        else:
-            current_tasks = tasks_holiday
-
-        # RESTORE STATE: Create new checkboxes, checking memory for saved values
-        for task in current_tasks:
-            # .get(task, False) means: "Get the saved value, or default to False if new"
-            is_checked = task_states.get(task, False) 
-            task_list.controls.append(ft.Checkbox(label=task, value=is_checked))
-        
-        status_text.value = f"Mode set to: {mode}"
+        progress = checked / total if total > 0 else 0
+        progress_bar.value = progress
         page.update()
 
-    # UI Elements
-    status_text = ft.Text(value="Select your day type:", size=20, weight="bold")
-    
+    def checkbox_changed(e):
+        """When a box is clicked, save it immediately"""
+        saved_tasks[e.control.label] = e.control.value
+        save_data()
+
+    def set_mode(e, mode):
+        # Clear old list
+        task_list.controls.clear()
+        
+        # Decide which list to load
+        if mode == "Short":
+            current_tasks = tasks_short_day
+            status_text.value = "Mode: Home by 3:00 PM"
+        elif mode == "Long":
+            current_tasks = tasks_long_day
+            status_text.value = "Mode: Home by 5:30 PM"
+        else:
+            current_tasks = tasks_holiday
+            status_text.value = "Mode: Holiday / Home"
+
+        # Build checkboxes
+        for task in current_tasks:
+            # Check if we have a saved state for this task
+            is_checked = saved_tasks.get(task, False)
+            
+            task_list.controls.append(
+                ft.Checkbox(
+                    label=task, 
+                    value=is_checked, 
+                    on_change=checkbox_changed
+                )
+            )
+        
+        # Save the mode so app remembers next time
+        page.client_storage.set("last_mode", mode)
+        update_progress()
+        page.update()
+
+    def run_timer(seconds, message):
+        """Mobile friendly timer with SnackBar"""
+        status_text.value = f"⏳ Timer: {int(seconds/60)} mins"
+        page.update()
+        
+        time.sleep(seconds)
+        
+        # Play generic system sound (if browser allows) and show popup
+        page.snack_bar = ft.SnackBar(
+            content=ft.Text(f"⏰ {message}", size=20),
+            bgcolor=ft.Colors.GREEN_700,
+            open=True
+        )
+        status_text.value = "✅ Timer Finished!"
+        page.update()
+
+    def start_coding_timer(e):
+        # 25 mins = 1500 seconds
+        t = threading.Thread(target=run_timer, args=(1500, "Coding Session Done!"))
+        t.start()
+
+    # --- BUTTONS ---
     btn_short = ft.ElevatedButton(
-        content=ft.Text("Home by 3:00 PM", color=ft.Colors.WHITE),
+        content=ft.Text("Short Day", color=ft.Colors.WHITE),
         on_click=lambda e: set_mode(e, "Short"),
         bgcolor=ft.Colors.GREEN_400
     )
     
     btn_long = ft.ElevatedButton(
-        content=ft.Text("Home by 5:30 PM", color=ft.Colors.WHITE),
+        content=ft.Text("Long Day", color=ft.Colors.WHITE),
         on_click=lambda e: set_mode(e, "Long"),
         bgcolor=ft.Colors.RED_400
     )
-
+    
     btn_holiday = ft.ElevatedButton(
-        content=ft.Text("Holiday / Home", color=ft.Colors.WHITE),
+        content=ft.Text("Holiday", color=ft.Colors.WHITE),
         on_click=lambda e: set_mode(e, "Holiday"),
         bgcolor=ft.Colors.BLUE_400
     )
 
-    task_list = ft.Column()
-
-    # Layout
-    # Layout
+    # --- BUILD PAGE ---
     page.add(
         ft.Column(
             [
                 status_text,
+                progress_bar, # Added progress bar
                 ft.Row([btn_short, btn_long, btn_holiday], alignment=ft.MainAxisAlignment.CENTER),
                 
-                # --- NEW TIMER BUTTON ---
-                # --- NEW TIMER BUTTON ---
                 ft.Divider(),
                 ft.ElevatedButton(
-                    content=ft.Text("Start 25m Coding Timer", size=16),
-                    icon="timer",  # We used the string "timer" instead of ft.icons.TIMER
+                    content=ft.Text("Start 25m Focus Timer", size=16),
+                    icon="timer",
                     on_click=start_coding_timer,
                     bgcolor=ft.Colors.ORANGE_700,
                     color=ft.Colors.WHITE
                 ),
-                # ------------------------
 
                 ft.Divider(),
                 ft.Text("Your Mission:", size=16),
@@ -144,5 +169,11 @@ def main(page: ft.Page):
             horizontal_alignment=ft.CrossAxisAlignment.CENTER
         )
     )
+
+    # --- AUTO-LOAD LAST SESSION ---
+    # When app opens, check if we remember the last mode
+    last_mode = page.client_storage.get("last_mode")
+    if last_mode:
+        set_mode(None, last_mode)
 
 ft.app(target=main)
