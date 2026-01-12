@@ -20,17 +20,18 @@ jobs:
         with:
           python-version: '3.11'
           
-      - name: Install Flet Directly
+      - name: Install Flet
         run: |
-          python -m pip install --upgrade pip
+          pip install --upgrade pip
           pip install flet
-        
-      - name: Debug File System
-        run: ls -R
+          
+      - name: Verify Flet Install
+        run: flet --version
         
       - name: Build Web App
+        # We went back to 'flet', added 'main.py' explicitly, and added '--verbose' for debugging
         run: |
-          python -m flet build web main.py --base-url "/${{ github.event.repository.name }}/"
+          flet build web main.py --base-url "/${{ github.event.repository.name }}/" --verbose
           
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
