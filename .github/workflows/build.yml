@@ -20,17 +20,15 @@ jobs:
         with:
           python-version: '3.11'
           
-      - name: Install Dependencies
+      - name: Install Flet Directly
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install flet
         
-      - name: Verify Files (Debug)
+      - name: Debug File System
         run: ls -R
         
       - name: Build Web App
-        # We use 'python -m flet' to avoid "command not found" errors
-        # We also explicitly tell it to build 'main.py'
         run: |
           python -m flet build web main.py --base-url "/${{ github.event.repository.name }}/"
           
