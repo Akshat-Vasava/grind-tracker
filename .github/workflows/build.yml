@@ -25,13 +25,17 @@ jobs:
           pip install --upgrade pip
           pip install flet
           
-      - name: Verify Flet Install
-        run: flet --version
+      - name: Debug File System (CRITICAL STEP)
+        run: |
+          echo "Current Directory:"
+          pwd
+          echo "List of all files:"
+          ls -R
         
       - name: Build Web App
-        # Added '--yes' to auto-accept prompts
+        # We use '--module-name main' as requested by the error log
         run: |
-          flet build web main.py --base-url "/${{ github.event.repository.name }}/" --yes --verbose
+          flet build web --module-name main --base-url "/${{ github.event.repository.name }}/" --yes --verbose
           
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
